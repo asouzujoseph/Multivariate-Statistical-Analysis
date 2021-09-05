@@ -1,0 +1,79 @@
+---
+title: "Multivariate statistical analysis - soil samples in Brazil"
+author: "Nnamdi Joseph Asouzu"
+output: html_document
+---
+
+**Introduction** <br>
+Brazil is the biggest producer of sugarcane in the world. There are different climates, relief and vegetation in Brazil which results to diversity of soil types and differences in levels of soil fertility. To improve and sustain sugarcane production capacity of Brazil, it is pertinent to assess fertility of soils from regions that are major players in sugarcane cultivation by analyzing soil physicochemical properties. The results of the physicochemical analyses will indicate the type of soil fertility treatment suitable for each sugarcane cultivation zone. This project used multivariate statistical techniques to group soil samples from different regions of Brazil into clusters based on similarity of physicochemical properties. This grouping makes it easier to design specific soil fertility restoration treatment for each cluster. <br>
+
+**Description of dataset** <br>
+Since almost all the sugarcane crops in Brazil are produced in the South-Central and NorthEast regions (Nassar et al., 2018), the soil samples in the data set used for this report were obtained from 27 locations in 9 states located in South-Central and NorthEast regions of Brazil. The soils were collected from 0 to 20 cm layer. The number of samples collected from any given state varied according to the heterogeneity of soils in that region (Chagas et al., 2019). The dataset contains 27 observations and 17 variables (of which three variables are non-numeric). In the dataset, the name of the numeric variables were written as chemical symbols and the full meaning are as follows: <br>
+
+V - Base saturation <br>
+CTC - Effective cation exchange capacity <br>
+Ca2+ - Calcium ions<br>
+M - Saturation by aluminum <br>
+MO - Organic carbon <br>
+Al3+- Aluminum ion<br>
+P – Phosphorus <br>
+K+ – Potassium ion <br>
+Mg2+ - Magnesium ion <br>
+pH – measure of acidity or alkalinity  <br>
+H+Al – Exchangeable acidity <br>
+Sandy – sand content of soil  <br>
+Silt – Silt content of soil <br>
+Clay – clay content of soil <br>
+
+Load necessary libraries <br>
+```{r}
+library(factoextra); library (GGally);library(tidyverse); library (MASS);library(MVN)
+```
+
+Import and explore data <br>
+```{r}
+soil_data = read.csv ("C:/Users/Nnamdi/Downloads/soilData.csv", header = TRUE) 	# set working directory to folder with data set
+soil = soil_data [ ,4:17] 	# select the numeric columns or variables
+rownames(soil) = soil_data [, 3] 	# set row names to Soil IDs
+plot(soil) # graphically explore data set and check for outliers / correlation
+soil = soil [-9,] 	# remove outlier
+```
+Principal component analysis <br>
+```{r}
+ggcorr(soil, label = TRUE) 	# graphical Pearson correlation result
+pca = princomp(soil, cor = TRUE) 	# principal component function
+screeplot(pca, type = "lines") 	# pick 4 principal components
+pca$loadings 	# the contribution of variables to each principal component
+summary(pca) 	# the first four PCs explains ~ 80% of the variance
+pca$sdev 	# standard deviation of PCs
+pca.var = pca$sdev^2 	# eigenvalues of the principal components
+pca$scores # values of the principal components / new variables
+fviz_pca_biplot (pca) 	# biplot of PCA
+fviz_pca_var (pca) 	# graph of variables
+PCs = as.data.frame(pca$scores[,1:4]) 	# a new data frame of the scores of the principal components
+```
+
+K-means clustering <br>
+```{r}
+my_data = scale(PCs [,1:4]) 	# scales data to eliminate effect of variance
+fviz_nbclust(my_data, kmeans, method = "wss") 	# compute total within-cluster sum of square
+groups = kmeans(PCs, centers = 4, nstart = 25) 	# group into clusters
+fviz_cluster(groups, data = PCs) 	# cluster plot
+```
+
+Linear discriminant analysis <br>
+```{r}
+mvn(my_data,mvnTest = "mardia") 	# test of multivariate normality
+PCs$Clusters = as.factor(groups$cluster) 	# cluster results to PCs data frame
+soil.lda=lda(Clusters~.,PCs) 	# fits an LDA model
+soil.lda 	# shows details of LDA model
+plot(soil.lda, col = as.integer(PCs$Clusters)) 	# plot of LDA model
+soil.pred=predict(soil.lda) 	# predict cluster of observations using LDA model
+soil.pred 	# shows posterior probability of observations
+hist(soil.pred$x, col="pink") 	# histogram of projections
+table(PCs$Clusters,soil.pred$class,dnn=c("From","Classified into")) 	# accuracy table
+soil.ldacv = lda(Clusters~.,PCs, CV=TRUE) 	# evaluation of LDA model with cross-validation
+table(PCs$Clusters,soil.ldacv$class,dnn=c("From","Classified into")) 	# accuracy of LDA
+```
+
+
